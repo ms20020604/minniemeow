@@ -1,0 +1,118 @@
+import org.opencv.core.*;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.CascadeClassifier;
+import org.tensorflow.TensorFlow;
+import org.tensorflow.ndarray.NdArrays;
+import org.tensorflow.types.TFloat32;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.util.*;
+
+public class MoodMirror {
+
+    public static void main(String[] args) {
+        // Load OpenCV library
+        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+
+        // Load face detection model
+        String faceCascadePath = "haarcascade_frontalface_default.xml";
+        CascadeClassifier faceDetector = new CascadeClassifier(faceCascadePath);
+
+        // Load the camera feed
+        VideoCapture camera = new VideoCapture(0);
+
+        if (!camera.isOpened()) {
+            System.out.println("Error: Camera not found!");
+            return;
+        }
+
+        Mat frame = new Mat();
+        JFrame displayWindow = createDisplayWindow("AI Mood Mirror");
+
+        while (true) {
+            // Read a frame from the camera
+            camera.read(frame);
+            if (frame.empty()) {
+                continue;
+            }
+
+            // Detect faces in the frame
+            MatOfRect faces = new MatOfRect();
+            faceDetector.detectMultiScale(frame, faces);
+
+            // Draw rectangles around detected faces
+            for (Rect rect : faces.toArray()) {
+                Imgproc.rectangle(frame, rect.tl(), rect.br(), new Scalar(0, 255, 0), 3);
+                Mat faceROI = frame.submat(rect);
+
+                // Preprocess faceROI for emotion model
+                Mat resizedFace = preprocessFace(faceROI);
+
+                // Predict emotion using the AI model
+                String emotion = predictEmotion(resizedFace);
+
+                // Display emotion label
+                Imgproc.putText(frame, emotion, new Point(rect.x, rect.y - 10),
+                        Imgproc.FONT_HERSHEY_SIMPLEX, 1.0, new Scalar(255, 255, 255), 2);
+            }
+
+            // Display the frame
+            updateDisplay(displayWindow, frame);
+
+            // Exit on pressing 'q'
+            if (new Scanner(System.in).hasNext("q")) {
+                break;
+            }
+        }
+
+        camera.release();
+    }
+
+    private static JFrame createDisplayWindow(String title) {
+        JFrame frame = new JFrame(title);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(800, 600);
+        frame.setVisible(true);
+        return frame;
+    }
+
+    private static void updateDisplay(JFrame frame, Mat mat) {
+        BufferedImage image = convertMatToBufferedImage(mat);
+        ImageIcon imageIcon = new ImageIcon(image);
+        JLabel label = new JLabel(imageIcon);
+        frame.setContentPane(label);
+        frame.revalidate();
+    }
+
+    private static BufferedImage convertMatToBufferedImage(Mat mat) {
+        MatOfByte mob = new MatOfByte();
+        Imgcodecs.imencode(".jpg", mat, mob);
+        byte[] byteArray = mob.toArray();
+        return Toolkit.getDefaultToolkit().createImage(byteArray);
+    }
+
+    private static Mat preprocessFace(Mat face) {
+        Mat gray = new Mat();
+        Imgproc.cvtColor(face, gray, Imgproc.COLOR_BGR2GRAY);
+        Mat resized = new Mat();
+        Imgproc.resize(gray, resized, new Size(48, 48)); // Assuming 48x48 input for emotion model
+        return resized;
+    }
+
+    private static String predictEmotion(Mat face) {
+        try (TensorFlow model = TensorFlow.load("path/to/emotion_model.tflite")) {
+            TFloat32 inputTensor = TFloat32.tensorOf(NdArrays.ofFloats(1, 48, 48, 1));
+            // Fill the tensor with preprocessed face data
+            // Process the model output to map to emotions
+            List<String> emotions = Arrays.asList("Happy", "Sad", "Angry", "Surprised", "Neutral");
+            int predictedIndex = new Random().nextInt(emotions.size()); // Placeholder for real prediction
+            return emotions.get(predictedIndex);
+        } catch (Exception e) {
+            return "Unknown";
+        }
+    }
+}
