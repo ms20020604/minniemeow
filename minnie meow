@@ -107,9 +107,10 @@ public class MoodMirror {
         try (TensorFlow model = TensorFlow.load("path/to/emotion_model.tflite")) {
             TFloat32 inputTensor = TFloat32.tensorOf(NdArrays.ofFloats(1, 48, 48, 1));
             // Fill the tensor with preprocessed face data
-            // Process the model output to map to emotions
-            List<String> emotions = Arrays.asList("Happy", "Sad", "Angry", "Surprised", "Neutral");
-            int predictedIndex = new Random().nextInt(emotions.size()); // Placeholder for real prediction
+
+            // Placeholder for real prediction
+            List<String> emotions = Arrays.asList("Happy", "Sad", "Angry", "Surprised", "Fear", "Neutral");
+            int predictedIndex = new Random().nextInt(emotions.size()); // Random prediction for demo
             return emotions.get(predictedIndex);
         } catch (Exception e) {
             return "Unknown";
